@@ -1,0 +1,39 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<div class="max-w-md mx-auto relative group">
+    <div
+        class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200">
+    </div>
+    <div class="relative bg-black/40 backdrop-blur-xl border border-white/10 p-8 rounded-2xl shadow-xl">
+        <h2
+            class="text-3xl font-bold mb-6 text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+            Create Account</h2>
+
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            {% for field in form %}
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">{{ field.label }}</label>
+                <input type="{{ field.field.widget.input_type }}" name="{{ field.name }}"
+                    class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                    {% if field.field.required %}required{% endif %} placeholder="{{ field.help_text|striptags }}">
+                {% if field.errors %}
+                <div class="text-red-400 text-xs mt-1">{{ field.errors.0 }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <button type="submit"
+                class="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-bold py-3 px-4 rounded-lg transform transition hover:scale-[1.02] shadow-lg shadow-blue-500/25">
+                Sign Up
+            </button>
+        </form>
+
+        <p class="mt-6 text-center text-gray-400 text-sm">
+            Already have an account?
+            <a href="{% url 'login' %}" class="text-blue-400 hover:text-blue-300 transition">Log in</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

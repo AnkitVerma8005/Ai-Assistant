@@ -1,0 +1,262 @@
+{% extends "core/base.html" %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<div class="max-w-4xl mx-auto space-y-8">
+
+    <div class="text-center">
+        <h2 class="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400 mb-4">
+            Video Summarizer</h2>
+        <p class="text-gray-400">Paste a YouTube video URL to get a concise summary using AI.</p>
+    </div>
+
+    <!-- Input Card -->
+    <div class="bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-2xl shadow-xl">
+        <form id="summarize-form" class="space-y-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Video URL</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="w-5 h-5 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+                            <path
+                                d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z" />
+                        </svg>
+                    </div>
+                    <input type="url" id="video-url"
+                        class="block w-full pl-10 bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
+                        placeholder="https://www.youtube.com/watch?v=..." required>
+                </div>
+            </div>
+
+            <button type="submit"
+                class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-3 px-4 rounded-xl transform transition hover:scale-[1.02] shadow-lg shadow-purple-500/25 flex justify-center items-center">
+                <span>Summarize Video</span>
+                <svg id="btn-spinner" class="hidden animate-spin ml-2 h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
+                </svg>
+            </button>
+        </form>
+    </div>
+
+    <!-- Result Area -->
+    <div id="result-area"
+        class="hidden bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-2xl shadow-xl animate-fade-in-up space-y-8">
+        <div>
+            <div class="flex justify-between items-start mb-4">
+                <h3 id="video-title" class="text-2xl font-bold text-white"></h3>
+                <div class="flex gap-2">
+                    <button id="btn-save-note" onclick="saveNote()" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 font-semibold py-2 px-4 rounded-lg border border-blue-500/30 transition shadow-lg text-sm flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                        <span>Save Note</span>
+                    </button>
+                    <button id="btn-export-pdf" onclick="exportPDF()" class="bg-pink-600/20 hover:bg-pink-600/40 text-pink-400 font-semibold py-2 px-4 rounded-lg border border-pink-500/30 transition shadow-lg text-sm flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Export PDF
+                    </button>
+                </div>
+            </div>
+            <div id="pdf-content" class="prose prose-invert max-w-none text-gray-300">
+                <h2 id="pdf-title" class="hidden text-black mb-4"></h2>
+                <div id="video-summary"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const form = document.getElementById('summarize-form');
+    const resultArea = document.getElementById('result-area');
+    const videoTitle = document.getElementById('video-title');
+    const videoSummary = document.getElementById('video-summary');
+    const btnSpinner = document.getElementById('btn-spinner');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const url = document.getElementById('video-url').value;
+        const btn = form.querySelector('button');
+
+        // Loading State
+        btn.disabled = true;
+        btn.classList.add('opacity-75', 'cursor-not-allowed');
+        btnSpinner.classList.remove('hidden');
+        resultArea.classList.add('hidden');
+
+        try {
+            const response = await fetch('{% url "generate_summary" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ url: url })
+            });
+            const data = await response.json();
+
+            if (data.error) {
+                alert("Error: " + data.error);
+                return;
+            }
+
+            // Show Result
+            videoTitle.textContent = data.title;
+            videoSummary.innerHTML = marked.parse(data.summary);
+            resultArea.classList.remove('hidden');
+
+            // Smooth Scroll to Result
+            resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        } catch (error) {
+            alert("Error generating summary. Please try again.");
+        } finally {
+            // Reset State
+            btn.disabled = false;
+            btn.classList.remove('opacity-75', 'cursor-not-allowed');
+            btnSpinner.classList.add('hidden');
+        }
+    });
+
+    async function copyToClipboard(btn, text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            const span = btn.querySelector('span');
+            const originalText = span.textContent;
+            span.textContent = 'Copied!';
+            btn.classList.add('bg-green-600/20', 'border-green-500/30', 'text-green-400');
+            setTimeout(() => {
+                span.textContent = originalText;
+                btn.classList.remove('bg-green-600/20', 'border-green-500/30', 'text-green-400');
+            }, 2000);
+        } catch (err) {
+            console.error('Failed to copy: ', err);
+        }
+    }
+
+    async function saveNote() {
+        const title = videoTitle.textContent;
+        // Get the raw HTML content of the summary
+        const content = videoSummary.innerHTML;
+        const btn = document.getElementById('btn-save-note');
+        const span = btn.querySelector('span');
+        
+        try {
+            const response = await fetch('/dashboard/notes/save/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ title: title, content: content })
+            });
+            const data = await response.json();
+            
+            if (response.ok && data.status === 'success') {
+                span.textContent = 'Saved!';
+                btn.classList.replace('text-blue-400', 'text-green-400');
+                btn.classList.replace('border-blue-500/30', 'border-green-500/30');
+            } else {
+                alert('Authentication required to save notes. Please sign in.');
+            }
+        } catch (error) {
+            alert('Failed to save note.');
+            console.error(error);
+        }
+    }
+
+    function exportPDF() {
+        const element = document.getElementById('pdf-content');
+        const title = videoTitle.textContent;
+        
+        // Show title in PDF only by temporarily unhiding
+        const pdfTitle = document.getElementById('pdf-title');
+        pdfTitle.textContent = title;
+        pdfTitle.classList.remove('hidden');
+        
+        // Temporarily adjust styling for better PDF rendering
+        element.style.color = '#000'; // Make text black for PDF
+        const oldBodyBg = document.body.style.background;
+        
+        var opt = {
+          margin:       1,
+          filename:     `${title.substring(0, 30)}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true },
+          jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+        
+        // Use html2pdf
+        html2pdf().set(opt).from(element).save().then(() => {
+            // Restore styles
+            element.style.color = '';
+            pdfTitle.classList.add('hidden');
+        });
+    }
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<style>
+    /* Custom Markdown Styles */
+    .prose h1,
+    .prose h2,
+    .prose h3,
+    .prose h4 {
+        background: linear-gradient(to right, #a78bfa, #f472b6);
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: bold;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+        display: inline-block;
+    }
+
+    .prose strong {
+        color: #e2e8f0;
+    }
+
+    .prose ul {
+        list-style-type: disc;
+        padding-left: 1.5rem;
+    }
+
+    .prose p {
+        margin-bottom: 0.5rem;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .animate-fade-in-up {
+        animation: fadeInUp 0.5s ease-out forwards;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+</style>
+{% endblock %}
